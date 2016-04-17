@@ -1,55 +1,42 @@
-## Coursera - Exploratory Data Analysis - Plotting Assignment 1
+## Coursera - Exploratory Data Analysis - Plotting Assignment 2
 ##
 ## plot4.R - generates plot4.png
 
+# Using data.table to make summaries easier
+library(data.table)
+
 ## First of all, we make sure we have the downloaded data available, we will
 ## put it in a file in the local working directory
-filename = "exdata_plotting1.zip"
+filename = "exdata_plotting2.zip"
 if (!file.exists(filename)) {
-  retval = download.file("https://d396qusza40orc.cloudfront.net/exdata%2Fdata%2Fhousehold_power_consumption.zip",
+  retval = download.file("https://d396qusza40orc.cloudfront.net/exdata%2Fdata%2FNEI_data.zip",
                          destfile = filename,
                          method = "curl")
 }
 
-## Reading the data from the contents of the zipped file
-df.power = read.csv(unz(filename, "household_power_consumption.txt"), header=T,
-                    sep=";", stringsAsFactors=F, na.strings="?",
-                    colClasses=c("character", "character", "numeric",
-                                 "numeric", "numeric", "numeric",
-                                 "numeric", "numeric", "numeric"))
+## Unzipping the files to the working dir.
+unzip(filename, exdir=getwd())
 
-## Formatting the date and time and subseting the data only on 2007-02-01 and 2007-02-02
-df.power$timestamp = strptime(paste(df.power$Date, df.power$Time),
-                              format="%d/%m/%Y %H:%M:%S", tz="UTC")
-startDate = strptime("01/02/2007 00:00:00", format="%d/%m/%Y %H:%M:%S", tz="UTC")
-endDate = strptime("02/02/2007 23:59:59", format="%d/%m/%Y %H:%M:%S", tz="UTC")
-df.power = df.power[df.power$timestamp >= startDate & df.power$timestamp <= endDate, ]
+## Reading the emissions data from the contents of the zipped file
+NEI = data.table(readRDS("summarySCC_PM25.rds"))
+SCC = data.table(readRDS("Source_Classification_Code.rds"))
 
-## Creating the plot
+## Finding the SCC entries that have to do with Coal and Comb (combustion)
+SCC.coal.index = grep("Coal", SCC$Short.Name, ignore.case=T, value=F)
+SCC.comb.index = grep("Comb", SCC$Short.Name, ignore.case=T, value=F)
+SCC.index = intersect(SCC.coal.index, SCC.comb.index)
+
+## Filtering the NEI dataset by coal combustion
+SCC.filtered = as.character(SCC[SCC.index, SCC])
+NEI.filtered = NEI[SCC %chin% SCC.filtered]
+
+# Aggregating year by year data
+agg.year = NEI.filtered[, sum(Emissions, na.rm=T), by="year"]
+
 png(filename="plot4.png", width=480, height=480)
-
-# Setting the canvas for 4 plots
-par(mfcol=c(2,2))
-
-# First plot
-plot(df.power$timestamp, df.power$Global_active_power, type="l", xlab="",
-     ylab="Global Active Power")
-
-# Second plot
-plot(df.power$timestamp, df.power$Sub_metering_1, type="l", xlab="",
-     ylab="Energy sub metering")
-lines(df.power$timestamp, df.power$Sub_metering_2, col="red")
-lines(df.power$timestamp, df.power$Sub_metering_3, col="blue")
-legend("topright", legend=c("Sub_metering_1", "Sub_metering_2", "Sub_metering_3"),
-       col=c("black", "red", "blue"), lwd=par("lwd"), bty="n")
-
-# Third Plot
-plot(df.power$timestamp, df.power$Voltage, type="l",
-     xlab="datetime", ylab="Voltage")
-
-# Fourth plot
-plot(df.power$timestamp, df.power$Global_reactive_power, type="l",
-     xlab="datetime", ylab="Global_reactive_power")
-
+plot(agg.year$year, agg.year$V1, type="l", col="blue", lwd=2,
+     xaxp  = c(1999, 2008, 3),
+     main="Total PM2.5 Emission from Coal Combustion per Year",
+     xlab="Year", ylab="Total PM2.5 Emissions")
+grid()
 dev.off()
-

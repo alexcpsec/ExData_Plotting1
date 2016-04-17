@@ -1,33 +1,34 @@
-## Coursera - Exploratory Data Analysis - Plotting Assignment 1
+## Coursera - Exploratory Data Analysis - Plotting Assignment 2
 ##
 ## plot2.R - generates plot2.png
 
+# Using data.table to make summaries easier
+library(data.table)
+
 ## First of all, we make sure we have the downloaded data available, we will
 ## put it in a file in the local working directory
-filename = "exdata_plotting1.zip"
+filename = "exdata_plotting2.zip"
 if (!file.exists(filename)) {
-  retval = download.file("https://d396qusza40orc.cloudfront.net/exdata%2Fdata%2Fhousehold_power_consumption.zip",
+  retval = download.file("https://d396qusza40orc.cloudfront.net/exdata%2Fdata%2FNEI_data.zip",
                          destfile = filename,
                          method = "curl")
 }
 
-## Reading the data from the contents of the zipped file
-df.power = read.csv(unz(filename, "household_power_consumption.txt"), header=T,
-                    sep=";", stringsAsFactors=F, na.strings="?",
-                    colClasses=c("character", "character", "numeric",
-                                 "numeric", "numeric", "numeric",
-                                 "numeric", "numeric", "numeric"))
+## Unzipping the files to the working dir.
+unzip(filename, exdir=getwd())
 
-## Formatting the date and time and subseting the data only on 2007-02-01 and 2007-02-02
-df.power$timestamp = strptime(paste(df.power$Date, df.power$Time),
-                              format="%d/%m/%Y %H:%M:%S", tz="UTC")
-startDate = strptime("01/02/2007 00:00:00", format="%d/%m/%Y %H:%M:%S", tz="UTC")
-endDate = strptime("02/02/2007 23:59:59", format="%d/%m/%Y %H:%M:%S", tz="UTC")
-df.power = df.power[df.power$timestamp >= startDate & df.power$timestamp <= endDate, ]
+## Reading the emissions data from the contents of the zipped file
+NEI = data.table(readRDS("summarySCC_PM25.rds"))
+SCC = data.table(readRDS("Source_Classification_Code.rds"))
 
-## Creating the plot
+NEI.balt = NEI[fips == "24510"]
+# Aggregating year by year data
+agg.year = NEI.balt[, sum(Emissions, na.rm=T), by="year"]
+
 png(filename="plot2.png", width=480, height=480)
-plot(df.power$timestamp, df.power$Global_active_power, type="l", xlab="",
-     ylab="Global Active Power (kilowatts)")
+plot(agg.year$year, agg.year$V1, type="l", col="blue", lwd=2,
+     xaxp  = c(1999, 2008, 3),
+     main="Total PM2.5 Emission from Baltimore City over the years",
+     xlab="Year", ylab="Total PM2.5 Emissions")
+grid()
 dev.off()
-
